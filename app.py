@@ -56,8 +56,15 @@ def fetch_live_stock_data():
     live_data = []
     for ticker in tickers:
         stock = yf.Ticker(ticker)
-        current_price = stock.history(period="1d")['Close'][-1]
-        live_data.append({"ticker": ticker, "price": current_price})
+        try:
+            hist = stock.history(period="1d")
+            if not hist.empty and 'Close' in hist.columns:
+                current_price = hist['Close'].iloc[-1]
+                live_data.append({"ticker": ticker, "price": current_price})
+            else:
+                live_data.append({"ticker": ticker, "price": "N/A"})
+        except Exception as e:
+            live_data.append({"ticker": ticker, "price": "Error"})
     return live_data
 
 def portfolio_tracker():
@@ -103,8 +110,11 @@ if selected_tab == "Home":
     # Display live stock prices in a scrolling ticker format
     live_stocks = fetch_live_stock_data()
     for stock in live_stocks:
-        st.markdown(f"**{stock['ticker']}:** ${stock['price']:.2f}", unsafe_allow_html=True)
-        time.sleep(1)  # This will create a delay between each update for a more ticker-like effect.
+        if stock['price'] == "N/A" or stock['price'] == "Error":
+            st.warning(f"**{stock['ticker']}:** Price unavailable")
+        else:
+            st.markdown(f"**{stock['ticker']}:** ${stock['price']:.2f}", unsafe_allow_html=True)
+        time.sleep(1)
 
     st.write("\n")
     st.write("Refresh the page to see the latest data.")
@@ -154,6 +164,7 @@ elif selected_tab == "Best Stocks for Intraday Trading":
 # Section 3: Detailed Entry & Stop-Loss
 elif selected_tab == "Entry/Stop-Loss Points":
     st.subheader("🔄 Exact Entry and Stop-Loss Points")
+    recommended_df = recommend_stocks()
     selected_stock = st.selectbox("Choose a Stock to View Detailed Entry/Stop-Loss:", recommended_df['ticker'])
     if selected_stock:
         stock_details = recommended_df[recommended_df['ticker'] == selected_stock].iloc[0]
