@@ -40,24 +40,44 @@ def calculate_trade_params(latest_price, sentiment_score):
 # Streamlit UI
 st.set_page_config(page_title="AI Stock Analysis", layout="wide")
 
+# Initialize Session State to share trade parameters across tabs
+if 'entry' not in st.session_state:
+    st.session_state.entry = None
+if 'stop_loss' not in st.session_state:
+    st.session_state.stop_loss = None
+if 'close_target' not in st.session_state:
+    st.session_state.close_target = None
+
+# Tabs for Dashboard and Chart
 tab1, tab2 = st.tabs(["📊 AI Analysis", "📈 Chart"])
 
 # --- TAB 1: AI Analysis ---
 with tab1:
     st.title("AI Stock Analysis Based on News Sentiment")
 
+    # User input for stock ticker
     stock_symbol = st.text_input("Enter Stock Symbol (e.g., AAPL, TSLA)", value="AAPL")
 
     if st.button("Analyze"):
         st.info("Fetching news and analyzing sentiment...")
+
+        # Scrape news headlines
         headlines = scrape_news(stock_symbol)
         sentiment_score = analyze_sentiment(headlines)
 
+        # Fetch latest stock price
         ticker = yf.Ticker(stock_symbol)
         latest_price = ticker.history(period="1d")["Close"].iloc[-1]
 
+        # Calculate trade parameters
         entry, stop_loss, close_target = calculate_trade_params(latest_price, sentiment_score)
 
+        # Save trade parameters to session state
+        st.session_state.entry = entry
+        st.session_state.stop_loss = stop_loss
+        st.session_state.close_target = close_target
+
+        # Display results
         st.subheader("Sentiment Analysis Results:")
         st.write(f"**Sentiment Score:** {sentiment_score:.2f}")
         st.write("**Trade Parameters:**")
@@ -65,6 +85,7 @@ with tab1:
         st.write(f"- **Stop Loss:** ${stop_loss}")
         st.write(f"- **Target Close:** ${close_target}")
 
+        # Show scraped headlines
         st.subheader("Latest News Headlines:")
         for headline in headlines:
             st.write(f"- {headline}")
@@ -75,34 +96,41 @@ with tab2:
     st.write("Plot entry, stop loss, and close target on a stock chart.")
 
     if st.button("Show Chart"):
-        end_date = datetime.now()
-        start_date = end_date - timedelta(days=5)
+        if st.session_state.entry is not None and st.session_state.stop_loss is not None and st.session_state.close_target is not None:
+            end_date = datetime.now()
+            start_date = end_date - timedelta(days=5)
 
-        data = yf.download(stock_symbol, start=start_date, end=end_date, interval="1h")
+            # Fetch stock data
+            data = yf.download(stock_symbol, start=start_date, end=end_date, interval="1h")
 
-        if not data.empty:
-            fig = go.Figure()
+            if not data.empty:
+                fig = go.Figure()
 
-            fig.add_trace(go.Candlestick(
-                x=data.index,
-                open=data['Open'],
-                high=data['High'],
-                low=data['Low'],
-                close=data['Close'],
-                name="Stock Data"
-            ))
+                # Add candlestick trace
+                fig.add_trace(go.Candlestick(
+                    x=data.index,
+                    open=data['Open'],
+                    high=data['High'],
+                    low=data['Low'],
+                    close=data['Close'],
+                    name="Stock Data"
+                ))
 
-            fig.add_hline(y=entry, line_dash="dash", line_color="green", annotation_text="Entry Point")
-            fig.add_hline(y=stop_loss, line_dash="dot", line_color="red", annotation_text="Stop Loss")
-            fig.add_hline(y=close_target, line_dash="dash", line_color="blue", annotation_text="Close Target")
+                # Plot trade levels
+                fig.add_hline(y=st.session_state.entry, line_dash="dash", line_color="green", annotation_text="Entry Point")
+                fig.add_hline(y=st.session_state.stop_loss, line_dash="dot", line_color="red", annotation_text="Stop Loss")
+                fig.add_hline(y=st.session_state.close_target, line_dash="dash", line_color="blue", annotation_text="Close Target")
 
-            fig.update_layout(
-                title=f"{stock_symbol} Trade Analysis Chart",
-                xaxis_title="Time",
-                yaxis_title="Price",
-                template="plotly_dark"
-            )
+                # Update layout
+                fig.update_layout(
+                    title=f"{stock_symbol} Trade Analysis Chart",
+                    xaxis_title="Time",
+                    yaxis_title="Price",
+                    template="plotly_dark"
+                )
 
-            st.plotly_chart(fig)
+                st.plotly_chart(fig)
+            else:
+                st.warning("No data available for this stock.")
         else:
-            st.warning("No data available for this stock.")
+            st.write("Run the analysis tab first to get trade parameters.")
