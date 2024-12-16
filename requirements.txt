@@ -1,10 +1,8 @@
-pip
-install
 streamlit
 yfinance
 plotly
 requests
 beautifulsoup4
 textblob
-python
--m textblob.download_corpora
+python-dateutil
+nltk
