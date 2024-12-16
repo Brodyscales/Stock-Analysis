@@ -1,9 +1,10 @@
 pip
 install
-streamlit 
+streamlit
 yfinance
 plotly
 requests
 beautifulsoup4
-nltk
 textblob
+python
+-m textblob.download_corpora
