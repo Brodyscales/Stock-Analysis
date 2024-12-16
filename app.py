@@ -3,6 +3,7 @@ import pandas as pd
 import yfinance as yf
 import random
 import plotly.graph_objects as go
+import time
 
 # Trusted sources and social media simulation
 def fetch_articles_and_social_media(stock):
@@ -47,6 +48,18 @@ def get_stock_chart(ticker):
     hist = stock.history(period="5d")  # Fetch last 5 days
     return hist
 
+def fetch_live_stock_data():
+    """
+    Fetch live stock data for multiple stocks to display on the homepage.
+    """
+    tickers = ["AMC", "F", "PLTR", "BBBY"]
+    live_data = []
+    for ticker in tickers:
+        stock = yf.Ticker(ticker)
+        current_price = stock.history(period="1d")['Close'][-1]
+        live_data.append({"ticker": ticker, "price": current_price})
+    return live_data
+
 def portfolio_tracker():
     """
     Simple portfolio tracker to add stocks and calculate profits.
@@ -78,67 +91,89 @@ def portfolio_tracker():
 st.set_page_config(page_title="Stock Analysis & Predictions", layout="wide")
 st.title("💹 AI-Powered Stock Prediction and Analysis")
 
+# Navigation tabs
+tabs = ["Home", "Sentiment & AI Prediction", "Best Stocks for Intraday Trading", "Entry/Stop-Loss Points", "Portfolio Tracker"]
+selected_tab = st.selectbox("Choose a Section", tabs)
+
+# Home Section: Live Stock Data (Bloom Wallet-style)
+if selected_tab == "Home":
+    st.subheader("📈 Live Stock Ticker")
+    st.write("Below are live stock prices, updated in real-time:")
+
+    # Display live stock prices in a scrolling ticker format
+    live_stocks = fetch_live_stock_data()
+    for stock in live_stocks:
+        st.markdown(f"**{stock['ticker']}:** ${stock['price']:.2f}", unsafe_allow_html=True)
+        time.sleep(1)  # This will create a delay between each update for a more ticker-like effect.
+
+    st.write("\n")
+    st.write("Refresh the page to see the latest data.")
+
 # Section 1: Sentiment Analysis
-st.subheader("🔍 Social Media Sentiment & AI Prediction")
-stock_to_check = st.text_input("Enter a Stock Ticker (e.g., AMC, PLTR):", "AMC")
-if stock_to_check:
-    try:
-        # Fetch trusted sources
-        articles, social_posts = fetch_articles_and_social_media(stock_to_check)
-        st.write("**Trusted Articles & News:**")
-        for article in articles:
-            st.info(article)
+elif selected_tab == "Sentiment & AI Prediction":
+    st.subheader("🔍 Social Media Sentiment & AI Prediction")
+    stock_to_check = st.text_input("Enter a Stock Ticker (e.g., AMC, PLTR):", "AMC")
+    if stock_to_check:
+        try:
+            # Fetch trusted sources
+            articles, social_posts = fetch_articles_and_social_media(stock_to_check)
+            st.write("**Trusted Articles & News:**")
+            for article in articles:
+                st.info(article)
 
-        st.write("**Trusted Social Media Posts:**")
-        for post in social_posts:
-            st.success(post)
+            st.write("**Trusted Social Media Posts:**")
+            for post in social_posts:
+                st.success(post)
 
-        # Calculate sentiment
-        sentiment = calculate_sentiment(stock_to_check)
-        st.write(f"**Social Media Sentiment Score:** {sentiment:.2f}%")
-        if sentiment > 80:
-            st.success(f"{stock_to_check} has a HIGH chance of making profits today! ⭐")
-        elif sentiment > 60:
-            st.warning(f"{stock_to_check} has a MODERATE chance of profit. Consider carefully.")
-        else:
-            st.error(f"{stock_to_check} has a LOW chance of making profits. Be cautious.")
+            # Calculate sentiment
+            sentiment = calculate_sentiment(stock_to_check)
+            st.write(f"**Social Media Sentiment Score:** {sentiment:.2f}%")
+            if sentiment > 80:
+                st.success(f"{stock_to_check} has a HIGH chance of making profits today! ⭐")
+            elif sentiment > 60:
+                st.warning(f"{stock_to_check} has a MODERATE chance of profit. Consider carefully.")
+            else:
+                st.error(f"{stock_to_check} has a LOW chance of making profits. Be cautious.")
 
-        # Show recent stock chart
-        hist = get_stock_chart(stock_to_check)
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(x=hist.index, y=hist['Close'], mode='lines', name='Close Price'))
-        fig.update_layout(title=f"{stock_to_check} Recent Price Chart", xaxis_title="Date", yaxis_title="Price (USD)")
-        st.plotly_chart(fig)
-    except Exception as e:
-        st.error(f"Error fetching data for {stock_to_check}: {e}")
+            # Show recent stock chart
+            hist = get_stock_chart(stock_to_check)
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(x=hist.index, y=hist['Close'], mode='lines', name='Close Price'))
+            fig.update_layout(title=f"{stock_to_check} Recent Price Chart", xaxis_title="Date", yaxis_title="Price (USD)")
+            st.plotly_chart(fig)
+        except Exception as e:
+            st.error(f"Error fetching data for {stock_to_check}: {e}")
 
 # Section 2: Best Stocks to Buy for Today
-st.subheader("💼 Today's Best Stocks for Intraday Trading")
-st.write("Below are AI-selected stocks under $50 with high sentiment and calculated profit potential:")
-recommended_df = recommend_stocks()
-st.dataframe(recommended_df)
+elif selected_tab == "Best Stocks for Intraday Trading":
+    st.subheader("💼 Today's Best Stocks for Intraday Trading")
+    st.write("Below are AI-selected stocks under $50 with high sentiment and calculated profit potential:")
+    recommended_df = recommend_stocks()
+    st.dataframe(recommended_df)
 
 # Section 3: Detailed Entry & Stop-Loss
-st.subheader("🔄 Exact Entry and Stop-Loss Points")
-selected_stock = st.selectbox("Choose a Stock to View Detailed Entry/Stop-Loss:", recommended_df['ticker'])
-if selected_stock:
-    stock_details = recommended_df[recommended_df['ticker'] == selected_stock].iloc[0]
-    st.write(f"**Stock:** {stock_details['ticker']}")
-    st.write(f"**Entry Price:** ${stock_details['entry']:.2f}")
-    st.write(f"**Stop-Loss Price:** ${stock_details['stop_loss']:.2f}")
-    st.write(f"**Sentiment Score:** {stock_details['sentiment']}%")
+elif selected_tab == "Entry/Stop-Loss Points":
+    st.subheader("🔄 Exact Entry and Stop-Loss Points")
+    selected_stock = st.selectbox("Choose a Stock to View Detailed Entry/Stop-Loss:", recommended_df['ticker'])
+    if selected_stock:
+        stock_details = recommended_df[recommended_df['ticker'] == selected_stock].iloc[0]
+        st.write(f"**Stock:** {stock_details['ticker']}")
+        st.write(f"**Entry Price:** ${stock_details['entry']:.2f}")
+        st.write(f"**Stop-Loss Price:** ${stock_details['stop_loss']:.2f}")
+        st.write(f"**Sentiment Score:** {stock_details['sentiment']}%")
 
-    # Fetch and show a chart
-    hist = get_stock_chart(selected_stock)
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x=hist.index, y=hist['Close'], mode='lines', name='Close Price'))
-    fig.add_hline(y=stock_details['entry'], line_dash="dash", line_color="green", annotation_text="Entry")
-    fig.add_hline(y=stock_details['stop_loss'], line_dash="dash", line_color="red", annotation_text="Stop-Loss")
-    fig.update_layout(title=f"{selected_stock} Intraday Analysis", xaxis_title="Date", yaxis_title="Price (USD)")
-    st.plotly_chart(fig)
+        # Fetch and show a chart
+        hist = get_stock_chart(selected_stock)
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(x=hist.index, y=hist['Close'], mode='lines', name='Close Price'))
+        fig.add_hline(y=stock_details['entry'], line_dash="dash", line_color="green", annotation_text="Entry")
+        fig.add_hline(y=stock_details['stop_loss'], line_dash="dash", line_color="red", annotation_text="Stop-Loss")
+        fig.update_layout(title=f"{selected_stock} Intraday Analysis", xaxis_title="Date", yaxis_title="Price (USD)")
+        st.plotly_chart(fig)
 
 # Section 4: Portfolio Tracker
-portfolio_tracker()
+elif selected_tab == "Portfolio Tracker":
+    portfolio_tracker()
 
 # Footer
 st.caption("Built with Streamlit | Powered by Yahoo Finance | AI-Simulated Analysis")
