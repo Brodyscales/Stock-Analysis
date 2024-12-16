@@ -1,76 +1,122 @@
 import streamlit as st
 import pandas as pd
-import plotly.graph_objects as go
 import yfinance as yf
+import plotly.graph_objects as go
+import requests
+from bs4 import BeautifulSoup
+from textblob import TextBlob
 from datetime import datetime, timedelta
 
-# Streamlit app setup
-st.set_page_config(page_title="Stock Prediction & Chart", layout="wide")
+# Function to scrape headlines from a website
+def scrape_news(stock_symbol):
+    url = f"https://finance.yahoo.com/quote/{stock_symbol}/news"
+    response = requests.get(url)
+    soup = BeautifulSoup(response.content, "html.parser")
 
-# Create tabs
-tab1, tab2 = st.tabs(["📊 Dashboard", "📈 Chart"])
+    # Extract news headlines
+    headlines = []
+    for item in soup.find_all("h3", class_="Mb(5px)"):
+        headline = item.text
+        if headline:
+            headlines.append(headline)
+    return headlines
 
-# --- TAB 1: OLD FUNCTIONALITY ---
+# Function to calculate sentiment score
+def analyze_sentiment(headlines):
+    total_score = 0
+    for headline in headlines:
+        analysis = TextBlob(headline)
+        total_score += analysis.sentiment.polarity
+    avg_score = total_score / len(headlines) if headlines else 0
+    return avg_score
+
+# Function to predict entry, stop loss, and close
+def calculate_trade_params(latest_price, sentiment_score):
+    # Example calculations based on sentiment
+    entry = latest_price * (1 + (sentiment_score * 0.01))  # Entry point
+    stop_loss = latest_price * 0.98  # Stop loss at 2% lower
+    close_target = latest_price * (1 + abs(sentiment_score * 0.02))  # Target based on sentiment
+    return round(entry, 2), round(stop_loss, 2), round(close_target, 2)
+
+# Streamlit UI
+st.set_page_config(page_title="AI Stock Analysis", layout="wide")
+
+# Tabs for Dashboard and Chart
+tab1, tab2 = st.tabs(["📊 AI Analysis", "📈 Chart"])
+
+# --- TAB 1: AI Analysis ---
 with tab1:
-    st.title("Stock Prediction Dashboard")
-    st.write("Welcome to the stock prediction tool!")
-    # Old code or main dashboard functionality goes here
-    st.subheader("Main Features")
-    st.write("Include all the existing features here.")
+    st.title("AI Stock Analysis Based on News Sentiment")
+    
+    # User input for stock ticker
+    stock_symbol = st.text_input("Enter Stock Symbol (e.g., AAPL, TSLA)", value="AAPL")
 
-    # Example of placeholder old code:
-    ticker = st.text_input("Enter Stock Ticker (e.g., AAPL, TSLA)", value="AAPL")
-    if st.button("Fetch Data"):
-        data = yf.download(ticker, period="5d", interval="1h")
-        st.write("Latest Stock Data:")
-        st.dataframe(data)
+    if st.button("Analyze"):
+        # Scrape news headlines
+        st.info("Fetching news and analyzing sentiment...")
+        headlines = scrape_news(stock_symbol)
+        sentiment_score = analyze_sentiment(headlines)
 
-# --- TAB 2: CHART FUNCTIONALITY ---
+        # Fetch latest stock price
+        ticker = yf.Ticker(stock_symbol)
+        latest_price = ticker.history(period="1d")["Close"][-1]
+        
+        # Calculate trade parameters
+        entry, stop_loss, close_target = calculate_trade_params(latest_price, sentiment_score)
+        
+        # Display results
+        st.subheader("Sentiment Analysis Results:")
+        st.write(f"**Sentiment Score:** {sentiment_score:.2f} ({'Positive' if sentiment_score > 0 else 'Negative'})")
+        st.write("**Trade Parameters:**")
+        st.write(f"- **Entry Point:** ${entry}")
+        st.write(f"- **Stop Loss:** ${stop_loss}")
+        st.write(f"- **Target Close:** ${close_target}")
+
+        # Show scraped headlines
+        st.subheader("Latest News Headlines:")
+        for headline in headlines:
+            st.write(f"- {headline}")
+
+# --- TAB 2: Chart Visualization ---
 with tab2:
-    st.title("Stock Entry Point Chart")
-    st.write("Visualize your entry, stop loss, and close positions.")
+    st.title("Visualize Trade Entry Points")
+    st.write("Plot entry, stop loss, and close target on a stock chart.")
 
-    # Input stock ticker and trade parameters
-    stock_symbol = st.text_input("Enter Stock Symbol (e.g., AAPL)", value="AAPL")
-    entry_price = st.number_input("Entry Price", value=150.0, step=0.1)
-    stop_loss = st.number_input("Stop Loss Price", value=145.0, step=0.1)
-    target_close = st.number_input("Close Target Price", value=155.0, step=0.1)
-
-    if st.button("Generate Chart"):
-        # Fetch historical data for the last day
+    # Input stock ticker
+    if st.button("Show Chart"):
         end_date = datetime.now()
-        start_date = end_date - timedelta(days=1)
-        data = yf.download(stock_symbol, start=start_date, end=end_date, interval="5m")
+        start_date = end_date - timedelta(days=5)
+        
+        # Fetch stock data
+        data = yf.download(stock_symbol, start=start_date, end=end_date, interval="1h")
 
         if not data.empty:
-            # Create a Plotly chart
+            # Plot candlestick chart
             fig = go.Figure()
 
-            # Add candlestick chart for stock data
+            # Add candlestick chart
             fig.add_trace(go.Candlestick(
                 x=data.index,
                 open=data['Open'],
                 high=data['High'],
                 low=data['Low'],
                 close=data['Close'],
-                name="Market Data"
+                name="Stock Data"
             ))
 
-            # Add entry point, stop loss, and close levels as horizontal lines
-            fig.add_hline(y=entry_price, line_dash="dash", line_color="green", annotation_text="Entry Price")
+            # Plot trade levels
+            fig.add_hline(y=entry, line_dash="dash", line_color="green", annotation_text="Entry Point")
             fig.add_hline(y=stop_loss, line_dash="dot", line_color="red", annotation_text="Stop Loss")
-            fig.add_hline(y=target_close, line_dash="dash", line_color="blue", annotation_text="Close Target")
+            fig.add_hline(y=close_target, line_dash="dash", line_color="blue", annotation_text="Close Target")
 
-            # Customize chart layout
+            # Update layout
             fig.update_layout(
-                title=f"{stock_symbol} Entry and Stop Loss Chart",
+                title=f"{stock_symbol} Trade Analysis Chart",
                 xaxis_title="Time",
                 yaxis_title="Price",
-                template="plotly_dark",
-                height=600
+                template="plotly_dark"
             )
 
-            # Show the chart
             st.plotly_chart(fig)
         else:
-            st.warning("No data available for the selected stock and time range.")
+            st.warning("No data available for this stock.")
