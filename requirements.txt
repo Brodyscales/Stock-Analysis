@@ -1,4 +1,6 @@
-yfinance
-pandas
-plotly
+pip
+install
 streamlit
+yfinance
+plotly
+pandas
