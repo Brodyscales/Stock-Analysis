@@ -1,0 +1,10 @@
+def analyze_sentiment(headlines):
+    total_score = 0
+    for headline in headlines:
+        analysis = TextBlob(headline)
+        sentiment_polarity = analysis.sentiment.polarity
+        st.write(f"Sentiment for headline: '{headline}' is {sentiment_polarity}")
+        total_score += sentiment_polarity
+
+    avg_score = total_score / len(headlines) if headlines else 0
+    return avg_score
