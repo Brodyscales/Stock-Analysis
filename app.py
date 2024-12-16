@@ -1,130 +1,76 @@
 import streamlit as st
 import pandas as pd
-import yfinance as yf
 import plotly.graph_objects as go
-import random
+import yfinance as yf
 from datetime import datetime, timedelta
 
-# ---------- Page Config ----------
-st.set_page_config(page_title="AI Stock Dashboard", layout="wide")
+# Streamlit app setup
+st.set_page_config(page_title="Stock Prediction & Chart", layout="wide")
 
-# ---------- Styles ----------
-st.markdown("""
-    <style>
-    body {
-        background-color: #0E0E10;
-        color: #F9FAFB;
-    }
-    .block-container {
-        padding: 1rem;
-    }
-    h1, h2, h3 {
-        color: #F472B6;
-    }
-    .stTextInput > div > div > input {
-        background-color: #333333;
-        color: white;
-    }
-    .stDataFrame {
-        background-color: #333333;
-        color: white;
-    }
-    .css-1cpxqw2 {
-        background-color: #18181B !important;
-    }
-    </style>
-""", unsafe_allow_html=True)
+# Create tabs
+tab1, tab2 = st.tabs(["📊 Dashboard", "📈 Chart"])
 
-# ---------- Sidebar Inputs ----------
-st.sidebar.header("Trading Parameters")
-ticker = st.sidebar.text_input("Enter Stock Ticker (e.g., TSLA, AAPL)", "AAPL").upper()
+# --- TAB 1: OLD FUNCTIONALITY ---
+with tab1:
+    st.title("Stock Prediction Dashboard")
+    st.write("Welcome to the stock prediction tool!")
+    # Old code or main dashboard functionality goes here
+    st.subheader("Main Features")
+    st.write("Include all the existing features here.")
 
-# Set trading strategy parameters
-entry_price = st.sidebar.number_input("Entry Price (Pre-Market)", min_value=0.0, value=150.0)
-stop_loss = st.sidebar.number_input("Stop Loss", min_value=0.0, value=145.0)
-close_price = st.sidebar.number_input("Sell Price (Before Close)", min_value=0.0, value=155.0)
-update_button = st.sidebar.button("Update Data")
+    # Example of placeholder old code:
+    ticker = st.text_input("Enter Stock Ticker (e.g., AAPL, TSLA)", value="AAPL")
+    if st.button("Fetch Data"):
+        data = yf.download(ticker, period="5d", interval="1h")
+        st.write("Latest Stock Data:")
+        st.dataframe(data)
 
-# ---------- Fetch Stock Data Function ----------
-def get_stock_data(ticker, period="1d", interval="5m"):
-    stock = yf.Ticker(ticker)
-    return stock.history(period=period, interval=interval)
+# --- TAB 2: CHART FUNCTIONALITY ---
+with tab2:
+    st.title("Stock Entry Point Chart")
+    st.write("Visualize your entry, stop loss, and close positions.")
 
-# ---------- Chart: Show Entry, Stop-Loss, Close ----------
-def plot_trading_strategy(data, entry_price, stop_loss, close_price):
-    fig = go.Figure()
+    # Input stock ticker and trade parameters
+    stock_symbol = st.text_input("Enter Stock Symbol (e.g., AAPL)", value="AAPL")
+    entry_price = st.number_input("Entry Price", value=150.0, step=0.1)
+    stop_loss = st.number_input("Stop Loss Price", value=145.0, step=0.1)
+    target_close = st.number_input("Close Target Price", value=155.0, step=0.1)
 
-    # Candlestick Chart
-    fig.add_trace(go.Candlestick(
-        x=data.index,
-        open=data['Open'],
-        high=data['High'],
-        low=data['Low'],
-        close=data['Close'],
-        name="Price"
-    ))
+    if st.button("Generate Chart"):
+        # Fetch historical data for the last day
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=1)
+        data = yf.download(stock_symbol, start=start_date, end=end_date, interval="5m")
 
-    # Add entry, stop loss, and sell points
-    fig.add_hline(y=entry_price, line_dash="solid", line_color="#F472B6", annotation_text="Entry Price", annotation_position="top left")
-    fig.add_hline(y=stop_loss, line_dash="dash", line_color="#EF4444", annotation_text="Stop Loss", annotation_position="bottom left")
-    fig.add_hline(y=close_price, line_dash="dashdot", line_color="#22C55E", annotation_text="Close Price", annotation_position="top left")
+        if not data.empty:
+            # Create a Plotly chart
+            fig = go.Figure()
 
-    # Chart aesthetics
-    fig.update_layout(
-        title="Trading Strategy Visualization",
-        xaxis_rangeslider_visible=False,
-        paper_bgcolor="#18181B",
-        plot_bgcolor="#18181B",
-        font=dict(color="white"),
-        xaxis=dict(gridcolor="#333333"),
-        yaxis=dict(gridcolor="#333333")
-    )
-    return fig
+            # Add candlestick chart for stock data
+            fig.add_trace(go.Candlestick(
+                x=data.index,
+                open=data['Open'],
+                high=data['High'],
+                low=data['Low'],
+                close=data['Close'],
+                name="Market Data"
+            ))
 
-# ---------- Main App Content ----------
-if update_button or ticker:
-    try:
-        # Fetch Stock Data
-        stock_data = get_stock_data(ticker)
-        st.title(f"📈 AI Stock Dashboard for {ticker}")
+            # Add entry point, stop loss, and close levels as horizontal lines
+            fig.add_hline(y=entry_price, line_dash="dash", line_color="green", annotation_text="Entry Price")
+            fig.add_hline(y=stop_loss, line_dash="dot", line_color="red", annotation_text="Stop Loss")
+            fig.add_hline(y=target_close, line_dash="dash", line_color="blue", annotation_text="Close Target")
 
-        # ---------- Chart Section ----------
-        st.subheader("Trading Strategy Chart")
-        strategy_chart = plot_trading_strategy(stock_data, entry_price, stop_loss, close_price)
-        st.plotly_chart(strategy_chart, use_container_width=True)
+            # Customize chart layout
+            fig.update_layout(
+                title=f"{stock_symbol} Entry and Stop Loss Chart",
+                xaxis_title="Time",
+                yaxis_title="Price",
+                template="plotly_dark",
+                height=600
+            )
 
-        # ---------- AI Predictions ----------
-        st.subheader("🤖 AI Predictions")
-        ai_prediction = {
-            "Next-Day Movement": f"{random.uniform(-3, 5):.2f}%",
-            "Direction": random.choice(["Bullish", "Bearish"]),
-            "Confidence": f"{random.uniform(75, 95):.2f}%"
-        }
-
-        col1, col2 = st.columns(2)
-        with col1:
-            st.metric("Predicted Movement", ai_prediction["Next-Day Movement"], delta=ai_prediction["Direction"])
-        with col2:
-            st.metric("Confidence Level", ai_prediction["Confidence"])
-
-        # ---------- Wallet Summary ----------
-        st.subheader("💼 Wallet Overview")
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("Buying Power", "$184.52")
-        with col2:
-            st.metric("Today's Return", "-$5.80", delta="-0.66%")
-        with col3:
-            st.metric("Total Return", "+$136.68", delta="+18.55%")
-
-        # ---------- Recent News ----------
-        st.subheader("📰 News & Social Mentions")
-        news_articles = [
-            f"{ticker} shows strong pre-market activity!",
-            f"{ticker} approaching key resistance near {close_price}."
-        ]
-        for article in news_articles:
-            st.write(f"✅ {article}")
-
-    except Exception as e:
-        st.error(f"An error occurred: {e}")
+            # Show the chart
+            st.plotly_chart(fig)
+        else:
+            st.warning("No data available for the selected stock and time range.")
