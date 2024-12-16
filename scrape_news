@@ -1,0 +1,25 @@
+def scrape_news(stock_symbol):
+    url = f"https://finance.yahoo.com/quote/{stock_symbol}/news"
+    try:
+        response = requests.get(url)
+        soup = BeautifulSoup(response.content, "html.parser")
+
+        # Extract news headlines
+        headlines = []
+        for item in soup.find_all("h3", class_="Mb(5px)"):
+            headline = item.text
+            if headline:
+                headlines.append(headline)
+
+        # Debugging log to check headlines
+        if headlines:
+            st.write(f"Scraped {len(headlines)} headlines for {stock_symbol}")
+            for headline in headlines:
+                st.write(f"- {headline}")
+        else:
+            st.write("No news headlines were found.")
+
+        return headlines
+    except Exception as e:
+        st.error(f"Failed to fetch news: {e}")
+        return []
