@@ -1,4 +1,9 @@
-streamlit
+pip
+install
+streamlit 
 yfinance
 plotly
-pandas
+requests
+beautifulsoup4
+nltk
+textblob
