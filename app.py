@@ -1,111 +1,130 @@
 import streamlit as st
 import pandas as pd
 import yfinance as yf
-import random
-import datetime as dt
 import plotly.graph_objects as go
+import random
+from datetime import datetime, timedelta
 
-# ---------- Helper Functions ----------
-def fetch_articles_and_social_media(stock):
-    """
-    Simulate trusted sources and articles scanning for stocks.
-    """
-    trusted_articles = [
-        f"Breaking news: {stock} shows strong bullish trend!",
-        f"Market analysts recommend {stock} as a solid pick for tomorrow."
-    ]
-    social_media_posts = [
-        f"@TrustedInvestor: {stock} is trending upward. 🚀",
-        f"@MarketGuru: {stock} could see gains tomorrow."
-    ]
-    return trusted_articles, social_media_posts
+# ---------- Page Config ----------
+st.set_page_config(page_title="AI Stock Dashboard", layout="wide")
 
-def calculate_sentiment():
-    """
-    Simulate social media sentiment analysis for a stock.
-    """
-    return random.uniform(60, 90)  # Simulated sentiment %
+# ---------- Styles ----------
+st.markdown("""
+    <style>
+    body {
+        background-color: #0E0E10;
+        color: #F9FAFB;
+    }
+    .block-container {
+        padding: 1rem;
+    }
+    h1, h2, h3 {
+        color: #F472B6;
+    }
+    .stTextInput > div > div > input {
+        background-color: #333333;
+        color: white;
+    }
+    .stDataFrame {
+        background-color: #333333;
+        color: white;
+    }
+    .css-1cpxqw2 {
+        background-color: #18181B !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
-def fetch_live_stock_data(tickers):
-    """
-    Fetch live stock data for multiple tickers.
-    """
-    live_data = []
-    for ticker in tickers:
-        stock = yf.Ticker(ticker)
-        try:
-            hist = stock.history(period="1d")
-            if not hist.empty and 'Close' in hist.columns:
-                current_price = hist['Close'].iloc[-1]
-                live_data.append({"ticker": ticker, "price": current_price})
-            else:
-                live_data.append({"ticker": ticker, "price": "N/A"})
-        except:
-            live_data.append({"ticker": ticker, "price": "Error"})
-    return live_data
+# ---------- Sidebar Inputs ----------
+st.sidebar.header("Trading Parameters")
+ticker = st.sidebar.text_input("Enter Stock Ticker (e.g., TSLA, AAPL)", "AAPL").upper()
 
-def simulate_next_day_prediction(tickers):
-    """
-    Simulate AI predictions for the next trading day.
-    """
-    predictions = []
-    for ticker in tickers:
-        # Simulate next-day price prediction
-        price_change = random.uniform(-3, 5)  # Price movement % (-3% to +5%)
-        direction = "Bullish" if price_change > 0 else "Bearish"
-        confidence = random.uniform(70, 95)  # Confidence %
-        
-        predictions.append({
-            "ticker": ticker,
-            "predicted_change": f"{price_change:.2f}%",
-            "direction": direction,
-            "confidence": f"{confidence:.2f}%"
-        })
-    return predictions
+# Set trading strategy parameters
+entry_price = st.sidebar.number_input("Entry Price (Pre-Market)", min_value=0.0, value=150.0)
+stop_loss = st.sidebar.number_input("Stop Loss", min_value=0.0, value=145.0)
+close_price = st.sidebar.number_input("Sell Price (Before Close)", min_value=0.0, value=155.0)
+update_button = st.sidebar.button("Update Data")
 
-# ---------- Streamlit UI ----------
-st.set_page_config(page_title="Next-Day AI Stock Predictions", layout="wide")
-st.title("🌟 AI Stock Predictions for Tomorrow")
+# ---------- Fetch Stock Data Function ----------
+def get_stock_data(ticker, period="1d", interval="5m"):
+    stock = yf.Ticker(ticker)
+    return stock.history(period=period, interval=interval)
 
-# Choose stocks to analyze
-st.subheader("📊 Select Stocks for Prediction")
-default_tickers = ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA"]
-user_tickers = st.text_input("Enter Stock Tickers (comma-separated):", "AAPL, MSFT, TSLA")
-tickers = [ticker.strip().upper() for ticker in user_tickers.split(",")]
+# ---------- Chart: Show Entry, Stop-Loss, Close ----------
+def plot_trading_strategy(data, entry_price, stop_loss, close_price):
+    fig = go.Figure()
 
-# Simulated Predictions for the Next Trading Day
-if st.button("Generate AI Predictions"):
-    st.subheader("📈 AI Predictions for the Day Ahead")
-    predictions = simulate_next_day_prediction(tickers)
-    
-    for pred in predictions:
-        st.write(f"**{pred['ticker']}**:")
-        st.info(f"Predicted Price Change: {pred['predicted_change']}")
-        st.success(f"Direction: {pred['direction']}")
-        st.warning(f"Confidence Level: {pred['confidence']}")
+    # Candlestick Chart
+    fig.add_trace(go.Candlestick(
+        x=data.index,
+        open=data['Open'],
+        high=data['High'],
+        low=data['Low'],
+        close=data['Close'],
+        name="Price"
+    ))
 
-    # Sentiment Analysis
-    st.subheader("🔍 Trusted Sources & Sentiment Analysis")
-    for ticker in tickers:
-        articles, social_posts = fetch_articles_and_social_media(ticker)
-        sentiment = calculate_sentiment()
+    # Add entry, stop loss, and sell points
+    fig.add_hline(y=entry_price, line_dash="solid", line_color="#F472B6", annotation_text="Entry Price", annotation_position="top left")
+    fig.add_hline(y=stop_loss, line_dash="dash", line_color="#EF4444", annotation_text="Stop Loss", annotation_position="bottom left")
+    fig.add_hline(y=close_price, line_dash="dashdot", line_color="#22C55E", annotation_text="Close Price", annotation_position="top left")
 
-        st.write(f"**{ticker}:**")
-        st.write("**Trusted Articles:**")
-        for article in articles:
-            st.info(article)
+    # Chart aesthetics
+    fig.update_layout(
+        title="Trading Strategy Visualization",
+        xaxis_rangeslider_visible=False,
+        paper_bgcolor="#18181B",
+        plot_bgcolor="#18181B",
+        font=dict(color="white"),
+        xaxis=dict(gridcolor="#333333"),
+        yaxis=dict(gridcolor="#333333")
+    )
+    return fig
 
-        st.write("**Social Media Posts:**")
-        for post in social_posts:
-            st.success(post)
+# ---------- Main App Content ----------
+if update_button or ticker:
+    try:
+        # Fetch Stock Data
+        stock_data = get_stock_data(ticker)
+        st.title(f"📈 AI Stock Dashboard for {ticker}")
 
-        st.write(f"**Sentiment Score:** {sentiment:.2f}%")
+        # ---------- Chart Section ----------
+        st.subheader("Trading Strategy Chart")
+        strategy_chart = plot_trading_strategy(stock_data, entry_price, stop_loss, close_price)
+        st.plotly_chart(strategy_chart, use_container_width=True)
 
-# Display Latest Prices
-st.subheader("🔄 Latest Stock Prices")
-live_data = fetch_live_stock_data(tickers)
-df_live = pd.DataFrame(live_data)
-st.dataframe(df_live)
+        # ---------- AI Predictions ----------
+        st.subheader("🤖 AI Predictions")
+        ai_prediction = {
+            "Next-Day Movement": f"{random.uniform(-3, 5):.2f}%",
+            "Direction": random.choice(["Bullish", "Bearish"]),
+            "Confidence": f"{random.uniform(75, 95):.2f}%"
+        }
 
-# ---------- Footer ----------
-st.caption("Built with Streamlit | Simulated AI Predictions | Data via Yahoo Finance")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("Predicted Movement", ai_prediction["Next-Day Movement"], delta=ai_prediction["Direction"])
+        with col2:
+            st.metric("Confidence Level", ai_prediction["Confidence"])
+
+        # ---------- Wallet Summary ----------
+        st.subheader("💼 Wallet Overview")
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Buying Power", "$184.52")
+        with col2:
+            st.metric("Today's Return", "-$5.80", delta="-0.66%")
+        with col3:
+            st.metric("Total Return", "+$136.68", delta="+18.55%")
+
+        # ---------- Recent News ----------
+        st.subheader("📰 News & Social Mentions")
+        news_articles = [
+            f"{ticker} shows strong pre-market activity!",
+            f"{ticker} approaching key resistance near {close_price}."
+        ]
+        for article in news_articles:
+            st.write(f"✅ {article}")
+
+    except Exception as e:
+        st.error(f"An error occurred: {e}")
